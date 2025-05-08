@@ -44,6 +44,21 @@ func handleRequest(w *response.Writer, r *request.Request) {
 		respondWithHTML(w, response.StatusCodeBadRequest, "400 Bad Request", "Your request honestly kinda sucked.")
 	case "/myproblem":
 		respondWithHTML(w, response.StatusCodeServerError, "500 Internal Server Error", "Okay, you know what? This one is on me.")
+	case "/video":
+		if r.RequestLine.Method == "GET" {
+			f, err := os.ReadFile("assets/vim.mp4")
+			if err != nil {
+				log.Printf("Error reading file: %v", err)
+				respondWithHTML(w, response.StatusCodeServerError, "500 Internal Server Error", "Sorry, I couldn't find the video.")
+				return
+			}
+			w.WriteStatusLine(response.StatusCodeOk)
+			headers := response.GetDefaultHeaders(len(f))
+			headers["Content-Type"] = "video/mp4"
+
+			w.WriteHeaders(headers)
+			w.WriteBody(f)
+		}
 	default:
 		respondWithHTML(w, response.StatusCodeOk, "200 OK", "Your request was an absolute banger.", map[string]string{"LETSGO": "YES"})
 	}
