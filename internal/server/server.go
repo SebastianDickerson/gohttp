@@ -2,6 +2,7 @@ package server
 
 import (
 	"crypto/sha256"
+	"crypto/tls"
 	"fmt"
 	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
@@ -16,6 +17,8 @@ type Server struct {
 	handler  Handler
 	listener net.Listener
 	closed   atomic.Bool
+	certFile string
+	keyFile  string
 }
 
 type Handler func(*response.Writer, *request.Request)
@@ -84,6 +87,21 @@ func Serve(port int, handler Handler) (*Server, error) {
 	return server, nil
 }
 
+func ServeTLS(port int, handler Handler, cert string, key string) (*Server, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return nil, err
+	}
+	server := &Server{
+		handler:  handler,
+		listener: listener,
+		certFile: cert,
+		keyFile:  key,
+	}
+	go server.listenTLS()
+	return server, nil
+}
+
 // Close shuts down the server and stops accepting new connections.
 func (s *Server) Close() error {
 	if s.closed.Swap(true) {
@@ -101,6 +119,30 @@ func (s *Server) listen() {
 				return
 			}
 			log.Printf("Error accepting connection: %v", err)
+			continue
+		}
+		go s.handle(conn)
+	}
+}
+
+func (s *Server) listenTLS() {
+	cert, err := tls.LoadX509KeyPair(s.certFile, s.keyFile)
+	if err != nil {
+		log.Fatalf("Error loading TLS certificate: %v", err)
+	}
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	tlsListener := tls.NewListener(s.listener, tlsConfig)
+	for {
+		conn, err := tlsListener.Accept()
+		if err != nil {
+			if s.closed.Load() {
+				return
+			}
+			log.Printf("Error accepting TLS connection: %v", err)
 			continue
 		}
 		go s.handle(conn)

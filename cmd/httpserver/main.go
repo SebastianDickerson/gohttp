@@ -16,7 +16,8 @@ import (
 const port = 42069
 
 func main() {
-	srv, err := server.Serve(port, handleRequest)
+	// srv, err := server.Serve(port, handleRequest)
+	srv, err := server.ServeTLS(port, handleRequest, "certs/localhost.crt", "certs/localhost.key")
 	if err != nil {
 		log.Fatalf("Error starting server: %v", err)
 	}
